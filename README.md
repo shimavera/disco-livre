@@ -52,7 +52,7 @@ Requisitos: macOS 13 ou mais novo (Intel ou Apple Silicon). Com as ferramentas d
 
 ## O app da barra de menus
 
-Um ícone pequeno de disco mostra quantos GB você tem livres. Clique para abrir o menu com **Analisar armazenamento**, **Limpeza manual segura**, **Atualizar agora** e **Sair**. A limpeza começa com uma simulação; só remove os itens seguros depois de uma confirmação final. A versão AppKit leve não precisa abrir o Terminal e atualiza o espaço livre a cada minuto.
+Um ícone pequeno de disco mostra quantos GB você tem livres. Clique para abrir o menu com **Analisar armazenamento**, **Escolher itens para limpar**, **Atualizar agora** e **Sair**. A limpeza permite marcar um, vários ou todos os itens seguros; mostra a seleção e o total e só apaga após confirmação final. A versão AppKit leve não precisa abrir o Terminal e atualiza o espaço livre a cada minuto. A limpeza libera espaço de armazenamento no disco, não memória RAM.
 
 Quando o toolchain oferece os macros SwiftUI, o build mantém o painel completo abaixo:
 
@@ -78,6 +78,7 @@ disco-livre                     # resumo: espaço livre, meta, vigilância
 disco-livre analisar            # raio-x completo
 disco-livre limpar              # mostra o lixo seguro (só simula)
 disco-livre limpar --executar   # apaga o lixo seguro (pede confirmação)
+disco-livre limpar --item <caminho> # simula só um item seguro (pode repetir)
 disco-livre mover <pasta> <HD>  # manda uma pasta pro HD externo e deixa um atalho
 ```
 

@@ -183,27 +183,45 @@ cmd_status() {
 }
 
 cmd_limpar() {
-  local executar=0 sim=0 silencioso=0 a
-  for a; do
-    case $a in
-      --executar)   executar=1 ;;
-      --sim|-y)     sim=1 ;;
-      --silencioso) silencioso=1 ;;
-      *) erro "opção desconhecida: $a" ;;
+  local executar=0 sim=0 silencioso=0 filtro=0
+  local -A selecionados elegiveis
+  while (( $# )); do
+    case $1 in
+      --executar)   executar=1; shift ;;
+      --sim|-y)     sim=1; shift ;;
+      --silencioso) silencioso=1; shift ;;
+      --item)
+        (( $# >= 2 )) || erro "use --item seguido do caminho mostrado na prévia"
+        filtro=1
+        selecionados[$2]=1
+        shift 2
+        ;;
+      *) erro "opção desconhecida: $1" ;;
     esac
   done
 
   local -a fila
   local total=0 tipo desc cam bloq t
   while IFS='|' read -r t desc bloq tipo cam; do
+    if (( filtro )) && [[ -z ${selecionados[$cam]-} ]]; then
+      continue
+    fi
     if (( bloq )); then
       (( silencioso )) || printf "  %s%-9s%s %s %s(feche o app pra limpar)%s\n" "$D" "$(humano $t)" "$N" "$desc" "$Y" "$N"
       continue
     fi
+    elegiveis[$cam]=1
     fila+=("$tipo|$cam|$desc|$t")
     (( total += t ))
     (( silencioso )) || printf "  %s%-9s%s %s\n" "$B" "$(humano $t)" "$N" "$desc"
   done < <(listar_lixo)
+
+  if (( filtro )); then
+    local solicitado
+    for solicitado in ${(k)selecionados}; do
+      (( ${+elegiveis[$solicitado]} )) || erro "item não está mais disponível ou está bloqueado por um app em uso: $(curto "$solicitado")"
+    done
+  fi
 
   LIBERADO_KB=0
   if (( ${#fila} == 0 )); then
@@ -668,6 +686,8 @@ ${B}Uso:${N}
   disco-livre analisar             raio-x completo: o que ocupa espaço e por quê
   disco-livre limpar               mostra o lixo seguro (simulação)
   disco-livre limpar --executar    apaga o lixo seguro (pede confirmação)
+  disco-livre limpar --item <caminho> seleciona só esse item (pode repetir; simulação)
+  disco-livre limpar --executar --item <caminho> limpa só o item selecionado
   disco-livre mover <pasta> <dest> move uma pasta pro HD externo e deixa um atalho
 
   disco-livre ativar               liga a vigilância automática

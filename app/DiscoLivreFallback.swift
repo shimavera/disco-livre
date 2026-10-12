@@ -3,13 +3,21 @@ import AppKit
 final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
     private enum UtilityMode {
         case analysis
-        case cleanupPreview
-        case cleanupConfirmation
+        case cleanupSelection
         case cleanupResult
+    }
+
+    private struct CleanupItem {
+        let kb: Int
+        let description: String
+        let blocked: Bool
+        let path: String
     }
 
     private var item: NSStatusItem!
     private var timer: Timer?
+    private var cleanupCheckboxes: [NSButton] = []
+    private var selectAllCheckbox: NSButton?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -33,7 +41,7 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
         menu.addItem(summary)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Analisar armazenamento…", action: #selector(analyzeAction), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Limpeza manual segura…", action: #selector(cleanupAction), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Escolher itens para limpar…", action: #selector(cleanupAction), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Atualizar agora", action: #selector(refreshAction), keyEquivalent: "r"))
         menu.addItem(.separator())
@@ -65,10 +73,10 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
 
     @objc private func cleanupAction() {
         runUtility(
-            arguments: ["limpar"],
-            title: "Prévia da limpeza segura",
-            message: "Esta simulação não apaga nada. Confira a lista antes de continuar.",
-            mode: .cleanupPreview
+            arguments: ["dados", "resumo"],
+            title: "Escolha o que limpar",
+            message: "Marque somente os itens que deseja remover. Nada será apagado nesta etapa.",
+            mode: .cleanupSelection
         )
     }
 
@@ -95,10 +103,8 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 guard let self else { return }
                 switch mode {
-                case .cleanupPreview:
-                    self.showCleanupPreview(result)
-                case .cleanupConfirmation:
-                    self.showCleanupConfirmation(result)
+                case .cleanupSelection:
+                    self.showCleanupSelection(result)
                 case .cleanupResult:
                     self.refresh()
                     self.showOutput(title: title, message: message, output: result, buttons: ["Fechar"])
@@ -109,58 +115,116 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func showCleanupPreview(_ output: String) {
-        let hasItems = output.contains("Total:") && !output.contains("Nada pra limpar agora.")
-        guard hasItems else {
-            showOutput(
-                title: "Nenhum item disponível para limpeza",
-                message: "Não encontrei lixo seguro que possa ser removido agora.",
-                output: output,
-                buttons: ["Fechar"]
-            )
+    private func showCleanupSelection(_ output: String) {
+        guard let data = output.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rawItems = root["lixo"] as? [[String: Any]] else {
+            showOutput(title: "Não consegui listar os itens", message: "Tente novamente em instantes.", output: output, buttons: ["Fechar"])
             return
         }
 
-        let response = showOutput(
-            title: "Prévia da limpeza segura",
-            message: "Nada foi apagado. Confira os itens e o total. Para prosseguir, haverá uma confirmação final.",
-            output: output,
-            buttons: ["Cancelar", "Continuar"]
-        )
-        if response == .alertSecondButtonReturn {
-            confirmCleanup()
+        let items = rawItems.compactMap { row -> CleanupItem? in
+            guard let kb = row["kb"] as? Int,
+                  let description = row["desc"] as? String,
+                  let blocked = row["bloqueado"] as? Bool,
+                  let path = row["cam"] as? String else { return nil }
+            return CleanupItem(kb: kb, description: description, blocked: blocked, path: path)
         }
-    }
-
-    private func confirmCleanup() {
-        runUtility(
-            arguments: ["limpar"],
-            title: "Confirmação final",
-            message: "A lista foi atualizada. Revise antes da confirmação final.",
-            mode: .cleanupConfirmation
-        )
-    }
-
-    private func showCleanupConfirmation(_ output: String) {
-        let hasItems = output.contains("Total:") && !output.contains("Nada pra limpar agora.")
-        guard hasItems else {
-            showOutput(title: "Nada para limpar", message: "A lista mudou e não há mais itens disponíveis.", output: output, buttons: ["Fechar"])
+        guard !items.isEmpty else {
+            showOutput(title: "Nada para limpar", message: "Não encontrei itens classificados como lixo seguro.", output: "Nenhum item de limpeza elegível foi encontrado.", buttons: ["Fechar"])
             return
         }
-        let response = showOutput(
+
+        cleanupCheckboxes.removeAll()
+        let contentHeight = max(230, CGFloat(items.count + 1) * 30 + 12)
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: contentHeight))
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 8),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -8),
+            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 8),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -8)
+        ])
+
+        let selectAll = NSButton(checkboxWithTitle: "Selecionar todos os itens disponíveis", target: self, action: #selector(toggleAllCheckboxes(_:)))
+        selectAll.isEnabled = items.contains(where: { !$0.blocked })
+        stack.addArrangedSubview(selectAll)
+        selectAllCheckbox = selectAll
+
+        for item in items {
+            let suffix = item.blocked ? " — feche o app para liberar" : ""
+            let checkbox = NSButton(checkboxWithTitle: "\(humanSize(item.kb))  ·  \(item.description)\(suffix)", target: nil, action: nil)
+            checkbox.isEnabled = !item.blocked
+            checkbox.state = .off
+            checkbox.identifier = NSUserInterfaceItemIdentifier(item.path)
+            cleanupCheckboxes.append(checkbox)
+            stack.addArrangedSubview(checkbox)
+        }
+
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 520, height: 230))
+        scroll.hasVerticalScroller = true
+        scroll.borderType = .bezelBorder
+        scroll.documentView = content
+
+        let alert = NSAlert()
+        alert.messageText = "Escolha o que apagar"
+        alert.informativeText = "Selecione um, alguns ou todos. Itens em uso aparecem desativados. Nada será apagado até a confirmação final."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Cancelar")
+        alert.addButton(withTitle: "Continuar")
+        alert.accessoryView = scroll
+        NSApp.activate(ignoringOtherApps: true)
+
+        if alert.runModal() == .alertSecondButtonReturn {
+            let selected = zip(items, cleanupCheckboxes).compactMap { pair in
+                let (item, checkbox) = pair
+                return checkbox.state == .on ? item : nil
+            }
+            guard !selected.isEmpty else {
+                showOutput(title: "Nenhum item selecionado", message: "Marque pelo menos um item para continuar.", output: "Nada foi apagado.", buttons: ["Fechar"])
+                return
+            }
+            confirmSelectedItems(selected)
+        }
+    }
+
+    @objc private func toggleAllCheckboxes(_ sender: NSButton) {
+        for checkbox in cleanupCheckboxes where checkbox.isEnabled {
+            checkbox.state = sender.state
+        }
+    }
+
+    private func confirmSelectedItems(_ items: [CleanupItem]) {
+        let total = items.reduce(0) { $0 + $1.kb }
+        let list = items.map { "• \(humanSize($0.kb))  \($0.description)" }.joined(separator: "\n")
+        let summary = "\(list)\n\nTotal selecionado: \(humanSize(total))\n\nIsso libera espaço de armazenamento no disco; não limpa memória RAM."
+        if showOutput(
             title: "Confirmação final",
-            message: "Confirme para remover somente os itens seguros mostrados abaixo.",
-            output: output,
-            buttons: ["Cancelar", "Limpar agora"]
-        )
-        if response == .alertSecondButtonReturn {
+            message: "Só os itens abaixo serão removidos. Deseja continuar?",
+            output: summary,
+            buttons: ["Cancelar", "Apagar selecionados"]
+        ) == .alertSecondButtonReturn {
+            var arguments = ["limpar", "--executar", "--sim"]
+            for item in items { arguments += ["--item", item.path] }
             runUtility(
-                arguments: ["limpar", "--executar", "--sim"],
-                title: "Limpeza concluída",
-                message: "Confira o resultado abaixo. Nenhum documento, foto ou projeto é incluído nesta limpeza.",
+                arguments: arguments,
+                title: "Resultado da limpeza",
+                message: "A ferramenta só processa os caminhos seguros selecionados e valida novamente se continuam elegíveis.",
                 mode: .cleanupResult
             )
         }
+    }
+
+    private func humanSize(_ kb: Int) -> String {
+        let bytes = Double(kb) * 1024
+        if bytes >= 1_000_000_000 { return String(format: "%.1f GB", bytes / 1_000_000_000) }
+        if bytes >= 1_000_000 { return String(format: "%.0f MB", bytes / 1_000_000) }
+        return String(format: "%.0f KB", Double(kb))
     }
 
     @discardableResult

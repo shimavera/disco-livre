@@ -47,8 +47,8 @@ Só funciona em **macOS 13 ou mais novo** (Intel ou Apple Silicon).
    ```
 
 6. **Diga à pessoa o que fazer agora:**
-   - O ícone de disco com os GB livres aparece na **barra de menus** (lá em cima, à direita). No menu, **Analisar armazenamento** abre um relatório e **Limpeza manual segura** mostra uma simulação e pede confirmação antes de apagar.
-   - O painel SwiftUI completo mostra também ajustes e detalhes; a versão AppKit leve inclui análise e limpeza manual, atualizando o espaço a cada minuto.
+   - O ícone de disco com os GB livres aparece na **barra de menus** (lá em cima, à direita). No menu, **Analisar armazenamento** abre um relatório e **Escolher itens para limpar** permite marcar itens, mostra a seleção e pede confirmação antes de apagar.
+   - A limpeza apaga apenas lixo seguro no disco, nunca RAM ou arquivos pessoais. O painel SwiftUI completo mostra também ajustes e detalhes; a versão AppKit leve inclui análise e limpeza seletiva, atualizando o espaço a cada minuto.
    - Ela vai receber notificações do Mac quando o espaço passar da meta. Na primeira vez, o macOS pode pedir permissão pra notificações (do "Editor de Scripts"): é só permitir.
 
 ## Permissões que podem aparecer
