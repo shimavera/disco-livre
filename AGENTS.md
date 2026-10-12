@@ -5,7 +5,7 @@ Você é um assistente de IA (Claude Code, Codex, Cursor etc.) e a pessoa pediu 
 ## O que é
 
 - `bin/disco-livre`: ferramenta de terminal (zsh puro, sem dependências) que analisa o disco, limpa lixo seguro e vigia o espaço livre.
-- `app/`: app da barra de menus "Disco Livre" (SwiftUI, compilado localmente com `swiftc`).
+- `app/`: app da barra de menus "Disco Livre" (SwiftUI quando o toolchain oferece macros; caso contrário, usa `DiscoLivreFallback.swift` com AppKit).
 - `skill/disco-livre/SKILL.md`: skill pro Claude Code / Codex usar a ferramenta.
 - `install.sh` / `uninstall.sh`: instalação e remoção.
 
@@ -24,7 +24,7 @@ Só funciona em **macOS 13 ou mais novo** (Intel ou Apple Silicon).
    ```bash
    command -v swiftc
    ```
-   Se não existir, explique: "Pra ter o app na barra de menus, o Mac precisa das ferramentas de desenvolvedor da Apple. Vai abrir uma janela da Apple: clique em Instalar. Leva alguns minutos." Depois rode `xcode-select --install` e **espere a pessoa confirmar que terminou**. Se ela não quiser, instale sem o app (`--sem-app`).
+   Se não existir, explique: "Pra ter o app na barra de menus, o Mac precisa das ferramentas de desenvolvedor da Apple. Vai abrir uma janela da Apple: clique em Instalar. Leva alguns minutos." Depois rode `xcode-select --install` e **espere a pessoa confirmar que terminou**. Se ela não quiser, instale sem o app (`--sem-app`). Se `swiftc` existir, mas a compilação SwiftUI falhar por falta dos macros, `app/build.sh` deve recorrer à versão AppKit leve em vez de omitir o app.
 
 4. **Rode o instalador sem perguntas interativas**, na pasta do repositório:
    ```bash
@@ -47,8 +47,8 @@ Só funciona em **macOS 13 ou mais novo** (Intel ou Apple Silicon).
    ```
 
 6. **Diga à pessoa o que fazer agora:**
-   - O ícone de disco com os GB livres aparece na **barra de menus** (lá em cima, à direita). Passar o mouse abre o resumo.
-   - Pra ver o raio-x completo: `disco-livre analisar`
+   - O ícone de disco com os GB livres aparece na **barra de menus** (lá em cima, à direita). No menu, **Analisar armazenamento** abre um relatório e **Limpeza manual segura** mostra uma simulação e pede confirmação antes de apagar.
+   - O painel SwiftUI completo mostra também ajustes e detalhes; a versão AppKit leve inclui análise e limpeza manual, atualizando o espaço a cada minuto.
    - Ela vai receber notificações do Mac quando o espaço passar da meta. Na primeira vez, o macOS pode pedir permissão pra notificações (do "Editor de Scripts"): é só permitir.
 
 ## Permissões que podem aparecer

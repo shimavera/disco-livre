@@ -46,13 +46,15 @@ O instalador pergunta:
 
 Pra instalar sem perguntas: `./install.sh --sim --meta 30 --vigia sim --auto-limpeza nao`
 
-Requisitos: macOS 13 ou mais novo (Intel ou Apple Silicon). O app da barra de menus precisa das ferramentas da Apple (`xcode-select --install`). Sem elas, a ferramenta de terminal funciona normalmente.
+Requisitos: macOS 13 ou mais novo (Intel ou Apple Silicon). Com as ferramentas de linha de comando da Apple, o app da barra compila; se o compilador não tiver os macros SwiftUI, o build usa uma versão AppKit leve. O painel completo em SwiftUI requer um toolchain com suporte a esses macros.
 
 ---
 
 ## O app da barra de menus
 
-Um ícone pequeno de disco mostra quantos GB você tem livres. **Passou o mouse, abre o resumo. Tirou, fecha.** Se clicar, ele fica aberto até você clicar fora.
+Um ícone pequeno de disco mostra quantos GB você tem livres. Clique para abrir o menu com **Analisar armazenamento**, **Limpeza manual segura**, **Atualizar agora** e **Sair**. A limpeza começa com uma simulação; só remove os itens seguros depois de uma confirmação final. A versão AppKit leve não precisa abrir o Terminal e atualiza o espaço livre a cada minuto.
+
+Quando o toolchain oferece os macros SwiftUI, o build mantém o painel completo abaixo:
 
 O resumo mostra só quatro coisas:
 
