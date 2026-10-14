@@ -86,6 +86,23 @@ if [[ -z $SEM_APP ]]; then
       rm -rf "$DEST/Disco Livre.app"
       cp -R "app/build/Disco Livre.app" "$DEST/"
       print -r -- "${G}✓${N} App em ${DEST/#$HOME/~}/Disco Livre.app"
+      # Inicia o app de menu em cada login do usuário, sem alterar a vigilância.
+      APP_PLIST="$HOME/Library/LaunchAgents/com.disco-livre.app.plist"
+      mkdir -p "$HOME/Library/LaunchAgents"
+      cat > "$APP_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.disco-livre.app</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/open</string><string>-a</string><string>$DEST/Disco Livre.app</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+</dict></plist>
+EOF
+      launchctl bootout "gui/$UID/com.disco-livre.app" 2>/dev/null || true
+      launchctl enable "gui/$UID/com.disco-livre.app"
+      launchctl bootstrap "gui/$UID" "$APP_PLIST"
+      print -r -- "${G}✓${N} Abertura automática configurada para o início da sessão"
       APP_OK=1
     else
       print -r -- "${Y}!${N} Não consegui compilar o app. A ferramenta de terminal funciona normalmente."
