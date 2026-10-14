@@ -54,6 +54,8 @@ Requisitos: macOS 13 ou mais novo (Intel ou Apple Silicon). Com as ferramentas d
 
 Um ícone pequeno de disco mostra quantos GB você tem livres. Clique para abrir o menu com **Analisar armazenamento**, **Escolher itens para limpar**, **Atualizar agora** e **Sair**. A limpeza permite marcar um, vários ou todos os itens seguros; mostra a seleção e o total e só apaga após confirmação final. A versão AppKit leve não precisa abrir o Terminal e atualiza o espaço livre a cada minuto. A limpeza libera espaço de armazenamento no disco, não memória RAM.
 
+Na instalação, o app é configurado para abrir no início de cada sessão do macOS. Essa configuração é independente da vigilância de armazenamento e é removida por `./uninstall.sh`.
+
 Quando o toolchain oferece os macros SwiftUI, o build mantém o painel completo abaixo:
 
 O resumo mostra só quatro coisas:
