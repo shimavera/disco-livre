@@ -80,6 +80,48 @@ barra() {
 #   lixeira = remove somente o item selecionado dentro da Lixeira
 #   captura = remove somente a captura reconhecida selecionada
 
+# Finder é a fonte da contagem da Lixeira, pois o acesso direto por shell pode
+# ser bloqueado pelo TCC mesmo quando Finder tem acesso. Não altera conteúdo.
+lixeira_info() {
+  local resultado quantidade bytes
+  resultado=$(/usr/bin/osascript 2>/dev/null <<'APPLESCRIPT'
+tell application id "com.apple.finder"
+  set itemCount to count of every item of trash
+  set totalBytes to 0
+  if itemCount > 0 then
+    set itemSizes to size of every item of trash
+    if class of itemSizes is list then
+      repeat with itemSize in itemSizes
+        try
+          set totalBytes to totalBytes + (contents of itemSize as integer)
+        on error
+          set totalBytes to -1
+          exit repeat
+        end try
+      end repeat
+    else
+      try
+        set totalBytes to itemSizes as integer
+      on error
+        set totalBytes to -1
+      end try
+    end if
+  end if
+  return (itemCount as text) & "|" & (totalBytes as text)
+end tell
+APPLESCRIPT
+  ) || return 1
+  IFS='|' read -r quantidade bytes <<< "$resultado"
+  [[ $quantidade == <-> && ( $bytes == <-> || $bytes == -<-> ) ]] || return 1
+  print -r -- "$quantidade|$bytes"
+}
+
+bytes_lixeira() {
+  local contagem bytes
+  IFS=':' read -r contagem bytes <<< "${1#lixeira-finder:}"
+  [[ $bytes == <-> ]] && print -r -- "$bytes" || print -r -- "0"
+}
+
 crashpads() {
   print -rl -- "$HOME/Library/Application Support"/*/Crashpad(N/) \
                "$HOME/Library/Application Support"/*/*/Crashpad(N/) \
@@ -109,15 +151,25 @@ alvos_seguros() {
     print -r -- "conteudo|Atualização já baixada — ${c:t:r}|$c|-"
   done
 
-  # Arquivos pessoais aparecem apenas para revisão manual e seleção explícita.
+  # A Lixeira aparece como uma única ação manual, com contagem e tamanho aproximado.
   local p nome localCaptura
-  for p in "$HOME/.Trash"/*(ND) "$HOME/.Trash"/.*(ND); do
-    [[ -d $HOME/.Trash && ! -L $HOME/.Trash ]] || break
-    [[ ${p:t} == . || ${p:t} == .. ]] && continue
-    [[ -e $p || -L $p ]] || continue
-    [[ $p != *'|'* && $p != *$'\n'* ]] || continue
-    print -r -- "lixeira|Lixeira — ${p:t}|$p|-|manual"
-  done
+  local info quantidade bytes tamanho marcador
+  info=${LIXEIRA_INFO:-}
+  [[ -n $info ]] || info=$(lixeira_info 2>/dev/null)
+  if [[ -n $info ]]; then
+    IFS='|' read -r quantidade bytes <<< "$info"
+    if (( quantidade > 0 )); then
+      marcador="lixeira-finder:$quantidade:$bytes"
+      if (( bytes >= 0 )); then
+        tamanho="aprox. $(humano $(( bytes / 1024 )))"
+      else
+        tamanho="tamanho aproximado indisponível"
+      fi
+      local rotulo="itens"
+      (( quantidade == 1 )) && rotulo="item"
+      print -r -- "lixeira|Esvaziar Lixeira inteira — $quantidade $rotulo, $tamanho|$marcador|-|manual"
+    fi
+  fi
   for localCaptura in "$HOME/Desktop" "$HOME/Downloads"; do
     [[ -d $localCaptura ]] || continue
     for p in "$localCaptura"/*(ND); do
@@ -134,7 +186,8 @@ medir() {
   case $1 in
     conteudo) kb "$2" ;;
     antigos)  kb_antigos "$2" ;;
-    lixeira|captura) kb "$2" ;;
+    lixeira) print -r -- "$(( $(bytes_lixeira "$2") / 1024 ))" ;;
+    captura) kb "$2" ;;
   esac
 }
 
@@ -144,8 +197,14 @@ apagar_alvo() {
     antigos)  find "$2" -type f -mtime +$LOG_DIAS -delete 2>/dev/null
               find "$2" -mindepth 1 -type d -empty -delete 2>/dev/null ;;
     lixeira)
-      [[ -d $HOME/.Trash && ! -L $HOME/.Trash && $2 == "$HOME/.Trash/"* && ${2:h} == "$HOME/.Trash" && ( -e $2 || -L $2 ) ]] || return 1
-      rm -rf -- "$2" 2>/dev/null || return 1
+      [[ $2 == lixeira-finder:* ]] || return 1
+      local esperado=${2#lixeira-finder:} esperadoContagem esperadoBytes atual
+      IFS=':' read -r esperadoContagem esperadoBytes <<< "$esperado"
+      atual=$(lixeira_info) || return 1
+      [[ $atual == "$esperadoContagem|$esperadoBytes" ]] || return 1
+      /usr/bin/osascript 2>/dev/null <<'APPLESCRIPT' || return 1
+tell application id "com.apple.finder" to empty trash
+APPLESCRIPT
       ;;
     captura)
       [[ ( ${2:h} == "$HOME/Desktop" || ${2:h} == "$HOME/Downloads" ) && -f $2 && ! -L $2 ]] || return 1
@@ -277,7 +336,7 @@ cmd_limpar() {
   local antes=$(livre_kb) item
   for item in $fila; do
     IFS='|' read -r tipo cam desc t <<< "$item"
-    apagar_alvo $tipo "$cam"
+    apagar_alvo $tipo "$cam" || erro "o item mudou ou não pôde ser processado; abra a lista novamente e confirme a seleção atual"
     log "limpou: $desc ($(humano $t))"
   done
   LIBERADO_KB=$total
@@ -286,13 +345,15 @@ cmd_limpar() {
 
 # ─── coleta (saída em linhas campo|campo, usada pelo terminal e pelo app) ──
 
-# kb|descrição|bloqueado(0/1)|tipo|caminho
+# kb|descrição|bloqueado(0/1)|tipo|caminho|manual
 listar_lixo() {
   local tipo desc cam cond t b manual
   while IFS='|' read -r tipo desc cam cond manual; do
     if [[ $manual == manual ]]; then
       case $tipo in
-        lixeira) [[ ${cam:h} == "$HOME/.Trash" && ( -e $cam || -L $cam ) ]] || continue ;;
+        lixeira)
+          [[ $cam == lixeira-finder:<->:-<-> || $cam == lixeira-finder:<->:<-> ]] || continue
+          ;;
         captura)
           [[ ( ${cam:h} == "$HOME/Desktop" || ${cam:h} == "$HOME/Downloads" ) && -f $cam && ! -L $cam ]] || continue
           local nome=${cam:t}
@@ -688,7 +749,9 @@ cmd_dados() {
       [[ $AUTO_LIMPEZA == sim ]] && al=1
       print -rn -- "{\"livre\":$(livre_kb),\"total\":$(total_kb),\"meta_kb\":$(gb_kb $META_GB),\"meta_gb\":$META_GB"
       print -rn -- ",\"vigilancia\":$(bool $at),\"auto_limpeza\":$(bool $al),\"intervalo\":$INTERVALO_HORAS"
-      print -rn -- ",\"tendencia_kb\":${tend:-null}"
+      local LIXEIRA_INFO=$(lixeira_info 2>/dev/null) lixeiraDisponivel=0
+      [[ -n $LIXEIRA_INFO ]] && lixeiraDisponivel=1
+      print -rn -- ",\"tendencia_kb\":${tend:-null},\"lixeira_disponivel\":$(bool $lixeiraDisponivel)"
 
       print -rn -- ",\"lixo\":["; sep=
       while IFS='|' read -r t desc b tipo cam manual; do

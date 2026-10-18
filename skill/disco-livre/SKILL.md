@@ -48,7 +48,7 @@ Apresente em uma tabela curta: o quê, tamanho, o que é, o que fazer. Depois of
 | Situação | Ação |
 |---|---|
 | Lixo seguro | `disco-livre limpar --executar --sim` |
-| Item específico da Lixeira ou captura listada pelo app | Use **Escolher itens para limpar**, selecione cada item e confirme a lista final |
+| Lixeira ou captura listada pelo app | Use **Escolher itens para limpar**, selecione a ação da Lixeira ou cada captura e confirme a lista final. A consulta da Lixeira usa Finder e pode solicitar autorização de Automação no macOS. |
 | Pasta da pessoa que ela quer manter (vídeos, fotos, projetos, stills do DaVinci) | `disco-livre mover <pasta> "/Volumes/<HD>/<destino>"` — copia, confere arquivo por arquivo, apaga o original e deixa um atalho |
 | Coisa da pessoa que ela não quer mais | ela mesma arrasta pra Lixeira, ou você move pra `~/.Trash` — nunca `rm -rf` em arquivo pessoal |
 | Tarefa em segundo plano que ela não usa | `disco-livre pausar-tarefa <label>` (reversível com `religar-tarefa`) — não apague o .plist |
@@ -80,6 +80,6 @@ A vigilância roda a cada 3 h e manda notificação no Mac quando: fica abaixo d
 ## Nunca
 
 - Apagar nada em `/System`, `/Library` (raiz), `/private/var` ou mexer no SIP.
-- Esvaziar a Lixeira inteira sem seleção item a item e confirmação explícita.
+- Esvaziar a Lixeira sem a seleção explícita da opção correspondente e a confirmação final no app.
 - Apagar pastas de app inteiras (`Application Support/<App>`) — só o que for cache/crash/log.
 - Desligar uma tarefa em segundo plano sem explicar o que ela faz.

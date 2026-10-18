@@ -123,6 +123,7 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
             showOutput(title: "Não consegui listar os itens", message: "Tente novamente em instantes.", output: output, buttons: ["Fechar"])
             return
         }
+        let trashAvailable = root["lixeira_disponivel"] as? Bool ?? true
 
         let items = rawItems.compactMap { row -> CleanupItem? in
             guard let kb = row["kb"] as? Int,
@@ -133,7 +134,10 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
                                manual: row["manual"] as? Bool ?? false)
         }
         guard !items.isEmpty else {
-            showOutput(title: "Nada para limpar", message: "Não encontrei itens classificados como lixo seguro.", output: "Nenhum item de limpeza elegível foi encontrado.", buttons: ["Fechar"])
+            let message = trashAvailable
+                ? "Não encontrei itens para limpeza seletiva."
+                : "Não consegui consultar a Lixeira. Permita que o Disco Livre controle o Finder em Ajustes do Sistema, em Privacidade e Segurança > Automação."
+            showOutput(title: "Nada para limpar", message: message, output: "Nenhum item de limpeza elegível foi encontrado.", buttons: ["Fechar"])
             return
         }
 
@@ -175,7 +179,10 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
 
         let alert = NSAlert()
         alert.messageText = "Escolha o que apagar"
-        alert.informativeText = "Selecione um, alguns ou todos. Itens em uso aparecem desativados. Nada será apagado até a confirmação final."
+        let trashNotice = trashAvailable
+            ? "A consulta da Lixeira usa Finder e pode pedir autorização de Automação no macOS."
+            : "A Lixeira não ficou disponível. Em Ajustes do Sistema, permita o controle do Finder em Privacidade e Segurança > Automação."
+        alert.informativeText = "Selecione um, alguns ou todos. \(trashNotice) Nada será apagado até a confirmação final."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Cancelar")
         alert.addButton(withTitle: "Continuar")

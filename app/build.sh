@@ -38,6 +38,7 @@ else
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSAppleEventsUsageDescription</key><string>O Disco Livre consulta o Finder para mostrar a quantidade e o tamanho aproximado da Lixeira e pode esvaziá-la após sua confirmação.</string>
 </dict></plist>
 EOF
   codesign --force --sign - "$APP"
@@ -61,6 +62,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppleEventsUsageDescription</key><string>O Disco Livre consulta o Finder para mostrar a quantidade e o tamanho aproximado da Lixeira e pode esvaziá-la após sua confirmação.</string>
 </dict></plist>
 EOF
 
