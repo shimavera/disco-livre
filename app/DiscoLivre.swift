@@ -50,7 +50,7 @@ struct Resumo: Decodable {
 }
 
 struct Lixo: Decodable, Identifiable {
-    var kb: Int64; var desc: String; var bloqueado: Bool; var cam: String
+    var kb: Int64; var desc: String; var bloqueado: Bool; var cam: String; var manual: Bool?
     var id: String { cam }
 }
 
@@ -364,7 +364,7 @@ struct PainelView: View {
     // ── as 4 coisas ──────────────────────────────────────────────────────
 
     func resumo(_ r: Resumo) -> some View {
-        let total = r.lixo.filter { !$0.bloqueado }.reduce(Int64(0)) { $0 + $1.kb }
+        let total = r.lixo.filter { !$0.bloqueado && $0.manual != true }.reduce(Int64(0)) { $0 + $1.kb }
         let ok = r.livre >= r.metaKb
         return VStack(alignment: .leading, spacing: 12) {
             // 1. espaço livre
@@ -523,6 +523,8 @@ struct PainelView: View {
                     Text(i.desc).lineLimit(1)
                     if i.bloqueado {
                         Text("feche o app").font(.caption2).foregroundStyle(.orange)
+                    } else if i.manual == true {
+                        Text("revisão manual").font(.caption2).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text(tamanho(i.kb)).monospacedDigit().foregroundStyle(.secondary)

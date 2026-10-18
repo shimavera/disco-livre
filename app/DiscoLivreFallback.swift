@@ -12,6 +12,7 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
         let description: String
         let blocked: Bool
         let path: String
+        let manual: Bool
     }
 
     private var item: NSStatusItem!
@@ -128,7 +129,8 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
                   let description = row["desc"] as? String,
                   let blocked = row["bloqueado"] as? Bool,
                   let path = row["cam"] as? String else { return nil }
-            return CleanupItem(kb: kb, description: description, blocked: blocked, path: path)
+            return CleanupItem(kb: kb, description: description, blocked: blocked, path: path,
+                               manual: row["manual"] as? Bool ?? false)
         }
         guard !items.isEmpty else {
             showOutput(title: "Nada para limpar", message: "Não encontrei itens classificados como lixo seguro.", output: "Nenhum item de limpeza elegível foi encontrado.", buttons: ["Fechar"])
@@ -157,7 +159,7 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
         selectAllCheckbox = selectAll
 
         for item in items {
-            let suffix = item.blocked ? " — feche o app para liberar" : ""
+            let suffix = item.blocked ? " — feche o app para liberar" : (item.manual ? " — revisão manual" : "")
             let checkbox = NSButton(checkboxWithTitle: "\(humanSize(item.kb))  ·  \(item.description)\(suffix)", target: nil, action: nil)
             checkbox.isEnabled = !item.blocked
             checkbox.state = .off
@@ -202,7 +204,7 @@ final class DiscoLivreFallback: NSObject, NSApplicationDelegate {
     private func confirmSelectedItems(_ items: [CleanupItem]) {
         let total = items.reduce(0) { $0 + $1.kb }
         let list = items.map { "• \(humanSize($0.kb))  \($0.description)" }.joined(separator: "\n")
-        let summary = "\(list)\n\nTotal selecionado: \(humanSize(total))\n\nIsso libera espaço de armazenamento no disco; não limpa memória RAM."
+        let summary = "\(list)\n\nTotal selecionado: \(humanSize(total))\n\nItens da Lixeira e capturas pessoais só são removidos após esta confirmação. Isso libera espaço de armazenamento no disco; não limpa memória RAM."
         if showOutput(
             title: "Confirmação final",
             message: "Só os itens abaixo serão removidos. Deseja continuar?",

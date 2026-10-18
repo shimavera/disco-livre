@@ -3,7 +3,7 @@
 # Licença MIT.
 
 emulate -R zsh
-setopt NULL_GLOB
+setopt NULL_GLOB EXTENDED_GLOB
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 
 VERSAO="1.0.0"
@@ -74,9 +74,11 @@ barra() {
 }
 
 # ─── o que é lixo seguro ───────────────────────────────────────────────────
-# tipo|descrição|caminho|app que precisa estar fechado (- = nenhum)
+# tipo|descrição|caminho|app que precisa estar fechado (- = nenhum)|manual (opcional)
 #   conteudo = apaga tudo dentro da pasta (a pasta fica)
 #   antigos  = apaga só arquivos com mais de $LOG_DIAS dias
+#   lixeira = remove somente o item selecionado dentro da Lixeira
+#   captura = remove somente a captura reconhecida selecionada
 
 crashpads() {
   print -rl -- "$HOME/Library/Application Support"/*/Crashpad(N/) \
@@ -106,12 +108,33 @@ alvos_seguros() {
   for c in "$HOME/Library/Caches"/*ShipIt(N/); do
     print -r -- "conteudo|Atualização já baixada — ${c:t:r}|$c|-"
   done
+
+  # Arquivos pessoais aparecem apenas para revisão manual e seleção explícita.
+  local p nome localCaptura
+  for p in "$HOME/.Trash"/*(ND) "$HOME/.Trash"/.*(ND); do
+    [[ -d $HOME/.Trash && ! -L $HOME/.Trash ]] || break
+    [[ ${p:t} == . || ${p:t} == .. ]] && continue
+    [[ -e $p || -L $p ]] || continue
+    [[ $p != *'|'* && $p != *$'\n'* ]] || continue
+    print -r -- "lixeira|Lixeira — ${p:t}|$p|-|manual"
+  done
+  for localCaptura in "$HOME/Desktop" "$HOME/Downloads"; do
+    [[ -d $localCaptura ]] || continue
+    for p in "$localCaptura"/*(ND); do
+      [[ -f $p && ! -L $p ]] || continue
+      nome=${p:t}
+      [[ $nome == (#i)(screenshot|screen\ shot|captura\ de\ tela|captura\ de\ ecrã|cleanshot)*.(png|jpg|jpeg|heic|tif|tiff|pdf) ]] || continue
+      [[ $p != *'|'* && $p != *$'\n'* ]] || continue
+      print -r -- "captura|Captura de tela — $nome|$p|-|manual"
+    done
+  done
 }
 
 medir() {
   case $1 in
     conteudo) kb "$2" ;;
     antigos)  kb_antigos "$2" ;;
+    lixeira|captura) kb "$2" ;;
   esac
 }
 
@@ -120,6 +143,16 @@ apagar_alvo() {
     conteudo) find "$2" -mindepth 1 -delete 2>/dev/null ;;
     antigos)  find "$2" -type f -mtime +$LOG_DIAS -delete 2>/dev/null
               find "$2" -mindepth 1 -type d -empty -delete 2>/dev/null ;;
+    lixeira)
+      [[ -d $HOME/.Trash && ! -L $HOME/.Trash && $2 == "$HOME/.Trash/"* && ${2:h} == "$HOME/.Trash" && ( -e $2 || -L $2 ) ]] || return 1
+      rm -rf -- "$2" 2>/dev/null || return 1
+      ;;
+    captura)
+      [[ ( ${2:h} == "$HOME/Desktop" || ${2:h} == "$HOME/Downloads" ) && -f $2 && ! -L $2 ]] || return 1
+      local nome=${2:t}
+      [[ $nome == (#i)(screenshot|screen\ shot|captura\ de\ tela|captura\ de\ ecrã|cleanshot)*.(png|jpg|jpeg|heic|tif|tiff|pdf) ]] || return 1
+      rm -- "$2" 2>/dev/null || return 1
+      ;;
   esac
   return 0
 }
@@ -201,8 +234,8 @@ cmd_limpar() {
   done
 
   local -a fila
-  local total=0 tipo desc cam bloq t
-  while IFS='|' read -r t desc bloq tipo cam; do
+  local total=0 tipo desc cam bloq t manual
+  while IFS='|' read -r t desc bloq tipo cam manual; do
     if (( filtro )) && [[ -z ${selecionados[$cam]-} ]]; then
       continue
     fi
@@ -210,6 +243,8 @@ cmd_limpar() {
       (( silencioso )) || printf "  %s%-9s%s %s %s(feche o app pra limpar)%s\n" "$D" "$(humano $t)" "$N" "$desc" "$Y" "$N"
       continue
     fi
+    # Itens pessoais só podem entrar na fila quando cada caminho foi selecionado.
+    [[ $manual == manual && $filtro == 0 ]] && continue
     elegiveis[$cam]=1
     fila+=("$tipo|$cam|$desc|$t")
     (( total += t ))
@@ -253,13 +288,24 @@ cmd_limpar() {
 
 # kb|descrição|bloqueado(0/1)|tipo|caminho
 listar_lixo() {
-  local tipo desc cam cond t b
-  while IFS='|' read -r tipo desc cam cond; do
-    [[ -d $cam ]] || continue
+  local tipo desc cam cond t b manual
+  while IFS='|' read -r tipo desc cam cond manual; do
+    if [[ $manual == manual ]]; then
+      case $tipo in
+        lixeira) [[ ${cam:h} == "$HOME/.Trash" && ( -e $cam || -L $cam ) ]] || continue ;;
+        captura)
+          [[ ( ${cam:h} == "$HOME/Desktop" || ${cam:h} == "$HOME/Downloads" ) && -f $cam && ! -L $cam ]] || continue
+          local nome=${cam:t}
+          [[ $nome == (#i)(screenshot|screen\ shot|captura\ de\ tela|captura\ de\ ecrã|cleanshot)*.(png|jpg|jpeg|heic|tif|tiff|pdf) ]] || continue
+          ;;
+      esac
+    else
+      [[ -d $cam ]] || continue
+    fi
     t=$(medir $tipo "$cam")
-    (( t < 1024 )) && continue
+    if [[ $manual != manual ]] && (( t < 1024 )); then continue; fi
     app_aberto "$cond" && b=1 || b=0
-    print -r -- "$t|$desc|$b|$tipo|$cam"
+    print -r -- "$t|$desc|$b|$tipo|$cam|$manual"
   done < <(alvos_seguros)
 }
 
@@ -645,8 +691,9 @@ cmd_dados() {
       print -rn -- ",\"tendencia_kb\":${tend:-null}"
 
       print -rn -- ",\"lixo\":["; sep=
-      while IFS='|' read -r t desc b tipo cam; do
-        print -rn -- "$sep{\"kb\":$t,\"desc\":$(js "$desc"),\"bloqueado\":$(bool $b),\"cam\":$(js "$cam")}"; sep=,
+      while IFS='|' read -r t desc b tipo cam manual; do
+        [[ $manual == manual ]] && local manual_json=true || local manual_json=false
+        print -rn -- "$sep{\"kb\":$t,\"desc\":$(js "$desc"),\"bloqueado\":$(bool $b),\"cam\":$(js "$cam"),\"manual\":$manual_json}"; sep=,
       done < <(listar_lixo)
 
       print -rn -- "],\"crashes\":["; sep=

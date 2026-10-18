@@ -67,6 +67,8 @@ O resumo mostra só quatro coisas:
 
 O **Ver mais** abre os detalhes: alertas (app crashando, tarefa que reabre app sozinha, com botão **Pausar**), o que exatamente dá pra limpar, as maiores pastas (inclusive as ocultas) e os ajustes.
 
+Em **Escolher itens para limpar**, a lista também mostra, para revisão manual, cada item da Lixeira e capturas de tela reconhecidas na raiz da Mesa e de Downloads. Marque somente o que deseja apagar e confirme na tela seguinte. Documentos, notebooks, outros arquivos e conteúdo dentro de subpastas não entram nessa lista. Esses itens nunca são removidos pela limpeza automática ou pelo botão de limpeza geral.
+
 Quando o espaço livre fica abaixo da meta, o ícone fica vermelho.
 
 ---
